@@ -1,6 +1,6 @@
 # ============================================================
 # SPY – Gamma / Delta / Vanna + Absolute Gamma + Combo Strikes
-# Plotly (dark), intradía con toggles y FULLSCREEN HTML
+# Plotly (dark), intradía con toggles y FULLSCREEN HTML.py
 # ============================================================
 import numpy as np
 import pandas as pd
