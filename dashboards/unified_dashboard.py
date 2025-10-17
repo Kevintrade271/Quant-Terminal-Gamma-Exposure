@@ -2,14 +2,13 @@
 
 import dash
 from dash import dcc, html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import numpy as np
 import pandas as pd
 import yfinance as yf
 from scipy.stats import norm
 from datetime import datetime, timezone
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 TICKER = "SPY"
 REFRESH_INTERVAL = 5 * 60 * 1000
@@ -28,19 +27,6 @@ def bs_charm(S, K, T, r, q, iv, cp):
     t1 = -q * np.exp(-q * T) * norm.cdf(s * d1) * s
     t2 = np.exp(-q * T) * norm.pdf(d1) * (2 * (r - q) * T - d2 * iv * np.sqrt(T)) / (2 * T * iv * np.sqrt(T) + 1e-12)
     return t1 + t2
-
-def delta_bs(S, K, T, r, q, sigma, cp):
-    d1 = bs_d1(S, K, T, r, q, sigma)
-    disc_q = np.exp(-q * np.asarray(T, float))
-    base = disc_q * norm.cdf(d1)
-    cp = np.asarray(cp)
-    return np.where(cp == 1, base, disc_q * (norm.cdf(d1) - 1.0))
-
-def vanna_dDelta_dSigma(S, K, T, r, q, sigma, cp, eps=1e-4):
-    sigma = np.asarray(sigma, float)
-    up = delta_bs(S, K, T, r, q, sigma + eps, cp)
-    dn = delta_bs(S, K, T, r, q, sigma - eps, cp)
-    return (up - dn) / (2.0 * eps)
 
 def _load_chain(ticker, exp):
     tk = yf.Ticker(ticker)
@@ -90,12 +76,12 @@ def plot_trace_style_plotly(df, spot, ticker="SPY", value="GEX", exp="nearest", 
     if df.empty: return go.Figure().update_layout(template="plotly_dark", title_text=f"Sin datos para {value}")
     exps_sorted = sorted(df["exp"].unique(), key=lambda d: pd.to_datetime(d))
     chosen = exps_sorted[0] if exp == "nearest" else pd.to_datetime(exp).date()
-    if chosen not in df["exp"].unique(): return go.Figure().update_layout(template="plotly_dark", title_text=f"Expiración no encontrada para {value}")
+    if chosen not in df["exp"].unique(): return go.Figure().update_layout(template="plotly_dark", title_text=f"Expiración no encontrada")
 
     sub = df[df["exp"] == chosen].copy()
     k_min, k_max = spot * (1 - zoom_pct), spot * (1 + zoom_pct)
     sub = sub[(sub['K'] >= k_min) & (sub['K'] <= k_max)]
-    if sub.empty: return go.Figure().update_layout(template="plotly_dark", title_text=f"Sin datos en el rango de zoom para {value}")
+    if sub.empty: return go.Figure().update_layout(template="plotly_dark", title_text=f"Sin datos en el rango de zoom")
 
     all_strikes_in_range = np.sort(sub['K'].unique())
     g_c = sub.groupby("K")[value].sum().where(sub.groupby("K")['side'].first() == 'C', 0).reindex(all_strikes_in_range, fill_value=0)
@@ -108,37 +94,33 @@ def plot_trace_style_plotly(df, spot, ticker="SPY", value="GEX", exp="nearest", 
     topC_idx = np.argsort(np.abs(right_vals.values))[-3:]
 
     fig = go.Figure()
-    fig.add_trace(go.Bar(y=all_strikes_in_range, x=left_vals, orientation='h', name='Puts', marker_color=PUT_COLOR, hovertemplate='<b>%{y} P</b><br>'+f'{value}: '+'%{x:,.0f}<extra></extra>'))
-    fig.add_trace(go.Bar(y=all_strikes_in_range, x=right_vals, orientation='h', name='Calls', marker_color=CALL_COLOR, hovertemplate='<b>%{y} C</b><br>'+f'{value}: '+'%{x:,.0f}<extra></extra>'))
+    fig.add_trace(go.Bar(y=all_strikes_in_range, x=left_vals, orientation='h', name='Puts', marker_color=PUT_COLOR))
+    fig.add_trace(go.Bar(y=all_strikes_in_range, x=right_vals, orientation='h', name='Calls', marker_color=CALL_COLOR))
 
     for side, top_indices, vals, x_align in [("P", topP_idx, left_vals, -1), ("C", topC_idx, right_vals, 1)]:
         for rank, idx in enumerate(np.flip(top_indices), start=1):
             if idx >= len(all_strikes_in_range): continue
             k, v = all_strikes_in_range[idx], vals.iloc[idx]
             bar_color = PUT_COLOR if side == 'P' else CALL_COLOR
-            fig.add_trace(go.Bar(y=[k], x=[v], orientation='h', showlegend=False, marker=dict(color=bar_color, line=dict(color='white', width=1.5)), hovertemplate=f'<b>{k} {side} (Top {rank})</b><br>{value}: {v:,.0f}<extra></extra>'))
             fig.add_annotation(y=k, x=v, text=f"{side}{rank}", showarrow=False, xshift=12 * x_align, font=dict(color="white", size=10, family="Arial Black"))
 
-    fig.add_hline(y=spot, line_width=1.5, line_dash="dash", line_color="#facc15", annotation_text=f"ATM {spot:.2f}", annotation_position="bottom right")
+    fig.add_hline(y=spot, line_width=1.5, line_dash="dash", line_color="#facc15")
 
     top_p_vals = left_vals.iloc[topP_idx].abs()
     top_c_vals = right_vals.iloc[topC_idx].abs()
     max_p = top_p_vals.max() if not top_p_vals.empty and not top_p_vals.isnull().all() else 0
     max_c = top_c_vals.max() if not top_c_vals.empty and not top_c_vals.isnull().all() else 0
-    xmax_val = max(max_p, max_c)
-    xmax = xmax_val * 1.25 if xmax_val > 0 else 1
+    xmax = max(max_p, max_c) * 1.25 if max(max_p, max_c) > 0 else 1
 
     fig.update_layout(
         template="plotly_dark",
-        title=f"{value} Profile (Split) — {ticker} @ {spot:.2f} | Exp: {chosen}",
+        title=f"{value} Profile — {ticker} @ {spot:.2f} | Exp: {chosen}",
         barmode='relative',
         yaxis_title='Strike',
-        xaxis_title=f"{value} (Dealer Exposure)",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis_title=f"{value} Exposure",
         xaxis=dict(range=[-xmax, xmax]),
-        yaxis=dict(range=[k_max, k_min], autorange=False, type='linear'),
-        margin=dict(l=70, r=20, t=60, b=40),
-        height=700
+        yaxis=dict(range=[k_max, k_min], autorange=False),
+        height=600
     )
     return fig
 
@@ -252,8 +234,8 @@ def create_heatmap_figure(pivot_df, spot, vix_zscore, ticker):
                 )
             )
 
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    title_text = f"{ticker} Volatility Dashboard | Spot: {spot:.2f} | VIX Z-Score: {vix_zscore:+.2f} ({color_theme}) | Última Actualización: {now}"
+    now = datetime.now().strftime("%H:%M:%S")
+    title_text = f"{ticker} Volatility | Spot: {spot:.2f} | VIX Z: {vix_zscore:+.2f} ({color_theme})"
 
     fig.update_layout(
         template="plotly_dark",
@@ -266,7 +248,7 @@ def create_heatmap_figure(pivot_df, spot, vix_zscore, ticker):
     )
     return fig
 
-app = dash.Dash(__name__, suppress_callback_exceptions=True)
+app = dash.Dash(__name__)
 app.title = "Quant Terminal - Unified Dashboard"
 
 app.layout = html.Div(style={'backgroundColor': '#0a0e17', 'minHeight': '100vh'}, children=[
@@ -284,7 +266,7 @@ app.layout = html.Div(style={'backgroundColor': '#0a0e17', 'minHeight': '100vh'}
                 selected_style={'backgroundColor': '#374151', 'color': '#e5e7eb', 'fontWeight': 'bold'}),
     ]),
 
-    html.Div(id='tabs-content'),
+    html.Div(id='tabs-content', style={'padding': '20px'}),
 
     dcc.Interval(
         id='interval-component',
@@ -295,71 +277,72 @@ app.layout = html.Div(style={'backgroundColor': '#0a0e17', 'minHeight': '100vh'}
 
 @app.callback(
     Output('tabs-content', 'children'),
-    [Input('tabs', 'value')]
+    [Input('tabs', 'value'),
+     Input('interval-component', 'n_intervals')]
 )
-def render_content(tab):
-    if tab == 'tab-gex-charm':
-        return html.Div([
-            dcc.Graph(id='gex-profile-graph', style={'height': '80vh'}),
-            dcc.Graph(id='charm-profile-graph', style={'height': '80vh', 'marginTop': '10px'}),
-        ])
-    elif tab == 'tab-volatility':
-        return html.Div([
-            dcc.Graph(id='volatility-heatmap', style={'height': '90vh'}),
-        ])
-
-@app.callback(
-    [Output('gex-profile-graph', 'figure'),
-     Output('charm-profile-graph', 'figure'),
-     Output('volatility-heatmap', 'figure'),
-     Output('live-update-text', 'children')],
-    [Input('interval-component', 'n_intervals')]
-)
-def update_all_graphs(n):
+def render_content(active_tab, n):
     try:
-        print(f"\n[{datetime.now().strftime('%H:%M:%S')}] ========== ACTUALIZANDO DASHBOARD UNIFICADO ==========")
+        print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Actualizando tab: {active_tab}")
 
-        print("📊 Cargando datos GEX/CHARM...")
-        spot, df_greeks = build_greeks_df(ticker=TICKER, max_exp=8, r=0.05, q=0.015, min_oi=100)
-        fig_gex = plot_trace_style_plotly(df_greeks, spot, ticker=TICKER, value="GEX", exp="nearest", zoom_pct=0.02)
-        fig_charm = plot_trace_style_plotly(df_greeks, spot, ticker=TICKER, value="CHARM", exp="nearest", zoom_pct=0.02)
-        print("✅ GEX/CHARM completado")
+        if active_tab == 'tab-gex-charm':
+            print("📊 Cargando datos GEX/CHARM...")
+            spot, df_greeks = build_greeks_df(ticker=TICKER, max_exp=8, r=0.05, q=0.015, min_oi=100)
+            fig_gex = plot_trace_style_plotly(df_greeks, spot, ticker=TICKER, value="GEX", exp="nearest", zoom_pct=0.02)
+            fig_charm = plot_trace_style_plotly(df_greeks, spot, ticker=TICKER, value="CHARM", exp="nearest", zoom_pct=0.02)
+            print("✅ GEX/CHARM completado")
 
-        print("🌡️ Cargando datos de Volatilidad...")
-        vix_hist, current_vix = get_vix_data()
-        vix_zscore = z_last(vix_hist.iloc[:-1].values, current_vix)
-        pivot_data, spot_price = load_and_build_matrix(ticker=TICKER)
-        fig_vol = create_heatmap_figure(pivot_data, spot_price, vix_zscore, TICKER)
-        print("✅ Volatilidad completado")
+            return html.Div([
+                dcc.Graph(figure=fig_gex),
+                dcc.Graph(figure=fig_charm, style={'marginTop': '20px'}),
+            ])
 
-        update_time = f"✅ Última Actualización: {datetime.now().strftime('%H:%M:%S')} | Spot: ${spot:.2f} | VIX: {current_vix:.2f} (Z: {vix_zscore:+.2f})"
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] ========== ACTUALIZACIÓN COMPLETA ==========\n")
+        elif active_tab == 'tab-volatility':
+            print("🌡️ Cargando datos de Volatilidad...")
+            vix_hist, current_vix = get_vix_data()
+            vix_zscore = z_last(vix_hist.iloc[:-1].values, current_vix)
+            pivot_data, spot_price = load_and_build_matrix(ticker=TICKER)
+            fig_vol = create_heatmap_figure(pivot_data, spot_price, vix_zscore, TICKER)
+            print("✅ Volatilidad completado")
 
-        return fig_gex, fig_charm, fig_vol, update_time
+            return html.Div([
+                dcc.Graph(figure=fig_vol),
+            ])
 
     except Exception as e:
-        print(f"❌ Error durante la actualización: {e}")
+        print(f"❌ Error: {e}")
         import traceback
         traceback.print_exc()
 
         error_fig = go.Figure().update_layout(
             template="plotly_dark",
-            title_text=f"Error al obtener datos. Reintentando...",
-            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-            height=700
+            title_text=f"Error al obtener datos: {str(e)}",
+            height=500
         )
-        return error_fig, error_fig, error_fig, f"❌ Error: {e}"
+        return html.Div([dcc.Graph(figure=error_fig)])
+
+@app.callback(
+    Output('live-update-text', 'children'),
+    [Input('interval-component', 'n_intervals')]
+)
+def update_status(n):
+    try:
+        spot, _ = build_greeks_df(ticker=TICKER, max_exp=2, r=0.05, q=0.015, min_oi=200)
+        vix_hist, current_vix = get_vix_data()
+        vix_zscore = z_last(vix_hist.iloc[:-1].values, current_vix)
+        return f"✅ Última Actualización: {datetime.now().strftime('%H:%M:%S')} | Spot: ${spot:.2f} | VIX: {current_vix:.2f} (Z: {vix_zscore:+.2f})"
+    except:
+        return f"⏳ Cargando datos... {datetime.now().strftime('%H:%M:%S')}"
 
 if __name__ == '__main__':
     print("""
 ╔════════════════════════════════════════════════════════════════╗
-║                 QUANT TERMINAL - UNIFIED DASHBOARD             ║
+║             QUANT TERMINAL - DASHBOARD UNIFICADO               ║
 ║                                                                ║
 ║  🚀 Dashboard iniciado en: http://localhost:8050               ║
-║  📊 Pestañas disponibles:                                      ║
-║     - GEX & CHARM: Exposición gamma y delta decay             ║
-║     - Volatilidad IV: Superficie de volatilidad implícita     ║
+║                                                                ║
+║  📊 Pestañas:                                                  ║
+║     • GEX & CHARM: Exposición gamma y delta decay             ║
+║     • Volatilidad IV: Superficie de volatilidad implícita     ║
 ║                                                                ║
 ║  ⏱️  Actualización automática cada 5 minutos                   ║
 ║  🎯 Ticker: SPY                                                ║
