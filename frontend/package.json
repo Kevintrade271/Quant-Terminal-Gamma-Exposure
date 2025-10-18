@@ -9,7 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@alloc/quick-lru": "^5.2.0",
+    "@babel/runtime": "^7.28.4",
+    "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
+    "@emotion/serialize": "^1.3.3",
+    "@emotion/sheet": "^1.4.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.4",
     "@mui/material": "^7.3.4",
