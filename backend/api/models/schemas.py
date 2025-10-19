@@ -16,6 +16,11 @@ class GreeksResponse(BaseModel):
     data: List[GreekDataPoint]
     ticker: str
     timestamp: str
+    gamma_flip: Optional[float] = None
+    call_wall: Optional[float] = None
+    put_wall: Optional[float] = None
+    call_wall_gex: Optional[float] = None
+    put_wall_gex: Optional[float] = None
 
 
 class VolatilityDataPoint(BaseModel):
@@ -39,6 +44,52 @@ class StatusResponse(BaseModel):
     vix_zscore: float
     ticker: str
     timestamp: str
+
+
+class IVSkewDataPoint(BaseModel):
+    exp: date
+    strike: float
+    moneyness: float
+    iv: float
+    side: str
+    oi: float
+
+
+class IVSkewResponse(BaseModel):
+    spot: float
+    data: List[IVSkewDataPoint]
+    ticker: str
+    timestamp: str
+
+
+class NetGammaProfile(BaseModel):
+    strikes: List[float]
+    net_gamma: List[float]
+
+
+class OperationalLevels(BaseModel):
+    slip_risk: Optional[float] = None
+    gamma_pin: Optional[float] = None
+    exhaustion: Optional[float] = None
+    convex_hotspot: Optional[float] = None
+
+
+class VolumeData(BaseModel):
+    strike: float
+    call_volume: float
+    put_volume: float
+    call_oi: float
+    put_oi: float
+
+
+class AdvancedAnalyticsResponse(BaseModel):
+    spot: float
+    ticker: str
+    timestamp: str
+    gamma_levels: dict
+    net_gamma_profile: dict
+    operational_levels: dict
+    volume_by_strike: dict
 
 
 class ErrorResponse(BaseModel):

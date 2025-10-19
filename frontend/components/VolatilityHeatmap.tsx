@@ -1,13 +1,16 @@
 'use client';
 
 import { Card, CardContent, Typography, Box } from '@mui/material';
+import { useRef } from 'react';
 import type { VolatilityResponse } from '@/lib/types';
+import ExportChartButton from './ExportChartButton';
 
 interface VolatilityHeatmapProps {
   data: VolatilityResponse;
 }
 
 export default function VolatilityHeatmap({ data }: VolatilityHeatmapProps) {
+  const heatmapRef = useRef<HTMLDivElement>(null);
   if (!data || !data.matrix || Object.keys(data.matrix).length === 0) {
     return (
       <Card sx={{ bgcolor: 'background.paper', p: 2 }}>
@@ -62,12 +65,15 @@ export default function VolatilityHeatmap({ data }: VolatilityHeatmapProps) {
   return (
     <Card sx={{ bgcolor: 'background.paper', p: 2 }}>
       <CardContent>
-        <Typography variant="h5" gutterBottom color="text.primary">
-          {data.ticker} Volatility | Spot: ${data.spot.toFixed(2)} | VIX Z: {data.vix_zscore >= 0 ? '+' : ''}
-          {data.vix_zscore.toFixed(2)} ({colorTheme})
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h5" color="text.primary">
+            {data.ticker} Volatility | Spot: ${data.spot.toFixed(2)} | VIX Z: {data.vix_zscore >= 0 ? '+' : ''}
+            {data.vix_zscore.toFixed(2)} ({colorTheme})
+          </Typography>
+          <ExportChartButton elementRef={heatmapRef} filename={`${data.ticker}_Volatility`} />
+        </Box>
 
-        <Box sx={{ overflowX: 'auto', mt: 2 }}>
+        <Box ref={heatmapRef} sx={{ overflowX: 'auto', mt: 2 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr>

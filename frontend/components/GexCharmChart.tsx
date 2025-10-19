@@ -2,6 +2,7 @@
 
 import { Card, CardContent, Typography, Box } from '@mui/material';
 import { Bar } from 'react-chartjs-2';
+import { useRef } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -12,7 +13,9 @@ import {
   Legend,
   ChartOptions,
 } from 'chart.js';
+import annotationPlugin from 'chartjs-plugin-annotation';
 import type { GreekDataPoint } from '@/lib/types';
+import ExportChartButton from './ExportChartButton';
 
 ChartJS.register(
   CategoryScale,
@@ -20,7 +23,8 @@ ChartJS.register(
   BarElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  annotationPlugin
 );
 
 interface GexCharmChartProps {
@@ -28,6 +32,9 @@ interface GexCharmChartProps {
   spot: number;
   ticker: string;
   valueType: 'GEX' | 'CHARM';
+  gammaFlip?: number | null;
+  callWall?: number | null;
+  putWall?: number | null;
   zoomPct?: number;
 }
 
@@ -36,8 +43,13 @@ export default function GexCharmChart({
   spot,
   ticker,
   valueType,
+  gammaFlip,
+  callWall,
+  putWall,
   zoomPct = 0.02,
 }: GexCharmChartProps) {
+  const chartRef = useRef<any>(null);
+
   if (!data || data.length === 0) {
     return (
       <Card sx={{ bgcolor: 'background.paper', p: 2 }}>
@@ -91,11 +103,82 @@ export default function GexCharmChart({
     ],
   };
 
+  const annotations: any = {};
+
+  if (gammaFlip && valueType === 'GEX') {
+    const flipIndex = strikes.findIndex(s => Math.abs(s - gammaFlip) < 0.5);
+    if (flipIndex !== -1) {
+      annotations.gammaFlip = {
+        type: 'line',
+        yMin: flipIndex,
+        yMax: flipIndex,
+        borderColor: '#fbbf24',
+        borderWidth: 3,
+        borderDash: [10, 5],
+        label: {
+          display: true,
+          content: `Gamma Flip: $${gammaFlip.toFixed(2)}`,
+          position: 'start',
+          backgroundColor: '#fbbf24',
+          color: '#1f2937',
+          font: {
+            weight: 'bold',
+          },
+        },
+      };
+    }
+  }
+
+  if (callWall && valueType === 'GEX') {
+    const wallIndex = strikes.findIndex(s => Math.abs(s - callWall) < 0.5);
+    if (wallIndex !== -1) {
+      annotations.callWall = {
+        type: 'line',
+        yMin: wallIndex,
+        yMax: wallIndex,
+        borderColor: '#8b5cf6',
+        borderWidth: 2,
+        borderDash: [5, 5],
+        label: {
+          display: true,
+          content: `Call Wall: $${callWall.toFixed(2)}`,
+          position: 'end',
+          backgroundColor: '#8b5cf6',
+          color: '#fff',
+        },
+      };
+    }
+  }
+
+  if (putWall && valueType === 'GEX') {
+    const wallIndex = strikes.findIndex(s => Math.abs(s - putWall) < 0.5);
+    if (wallIndex !== -1) {
+      annotations.putWall = {
+        type: 'line',
+        yMin: wallIndex,
+        yMax: wallIndex,
+        borderColor: '#ef4444',
+        borderWidth: 2,
+        borderDash: [5, 5],
+        label: {
+          display: true,
+          content: `Put Wall: $${putWall.toFixed(2)}`,
+          position: 'end',
+          backgroundColor: '#ef4444',
+          color: '#fff',
+        },
+      };
+    }
+  }
+
   const options: ChartOptions<'bar'> = {
     indexAxis: 'y' as const,
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
+      annotation: {
+        annotations,
+      },
       legend: {
         position: 'top' as const,
         labels: {
@@ -159,8 +242,11 @@ export default function GexCharmChart({
   return (
     <Card sx={{ bgcolor: 'background.paper', p: 2 }}>
       <CardContent>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <ExportChartButton chartRef={chartRef} filename={`${ticker}_${valueType}`} />
+        </Box>
         <Box sx={{ height: 600 }}>
-          <Bar data={chartData} options={options} />
+          <Bar ref={chartRef} data={chartData} options={options} />
         </Box>
       </CardContent>
     </Card>
