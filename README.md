@@ -1,6 +1,6 @@
 # 🎯 Quant Terminal - Dashboard de Gamma Exposure
 
-**Versión:** 2.1.0
+**Versión:** 2.1.1
 **Estado:** Production-Ready ✅
 
 Dashboard profesional para análisis de **Gamma Exposure (GEX)**, **Charm**, **Volatilidad Implícita** y **Niveles Operativos** de opciones sobre ETFs.
@@ -52,7 +52,7 @@ Este dashboard te muestra:
 3. **IV Skew** - Análisis del sesgo de volatilidad (miedo direccional)
 4. **Advanced Analytics** - Perfil gamma continuo + niveles operativos
 
-### 🎨 Features Implementadas (v2.1.0)
+### 🎨 Features Implementadas (v2.1.1)
 
 - ✅ **Selector de ticker dinámico** - SPY, QQQ, DIA, IWM, GLD, SLV
 - ✅ **Modo ODTE** - Filtra solo opciones que expiran hoy (0 DTE)
@@ -398,7 +398,7 @@ smooth_profile = f(dense_grid)
 - **Trading:** Zona de breakout potencial
 - **Cálculo:** Segunda derivada del perfil gamma
 
-### 7. Export to PNG ⭐ NUEVO (v2.1.0)
+### 7. Export to PNG ⭐ NUEVO (v2.1.1)
 
 **Qué es:** Botón para descargar cualquier gráfico como imagen PNG.
 
@@ -417,7 +417,7 @@ smooth_profile = f(dense_grid)
 2. Click en "Exportar PNG"
 3. El archivo se descarga automáticamente
 
-### 8. Refresh Manual ⭐ NUEVO (v2.1.0)
+### 8. Refresh Manual ⭐ NUEVO (v2.1.1)
 
 **Qué es:** Botón para actualizar datos sin esperar el auto-refresh (5 min).
 
@@ -844,7 +844,7 @@ Quant-Terminal-Gamma-Exposure/
 
 ## 🚀 Roadmap
 
-### ✅ Implementado (v2.1.0)
+### ✅ Implementado (v2.1.1)
 
 - Backend FastAPI con endpoints REST
 - Frontend Next.js con TypeScript
@@ -906,7 +906,7 @@ MIT License
 
 **Proyecto original:** [Kevin Trade 271](https://github.com/Kevintrade271/Quant-Terminal-Gamma-Exposure)
 
-**Refactorización y nuevas features:** v2.0.0 - v2.1.0
+**Refactorización y nuevas features:** v2.0.0 - v2.1.1
 
 ---
 
@@ -1002,5 +1002,5 @@ Operación:
 ---
 
 **Última actualización:** 19 de Octubre, 2025
-**Versión:** 2.1.0
+**Versión:** 2.1.1
 **Estado:** Production-Ready ✅
