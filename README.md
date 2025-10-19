@@ -1,7 +1,7 @@
 # 🎯 Quant Terminal - Dashboard de Gamma Exposure
 
 **Versión:** 2.1.1
-**Estado:** Production-Ready ✅
+**Estado:** En pruebas de testeo para el mercado.
 
 Dashboard profesional para análisis de **Gamma Exposure (GEX)**, **Charm**, **Volatilidad Implícita** y **Niveles Operativos** de opciones sobre ETFs.
 
