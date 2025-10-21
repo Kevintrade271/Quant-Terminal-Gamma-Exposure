@@ -1,8 +1,8 @@
 'use client';
 
-import { Card, CardContent, Typography, Box } from '@mui/material';
+import { Card, CardContent, Typography, Box, FormControlLabel, Checkbox, FormGroup } from '@mui/material';
 import { Bar } from 'react-chartjs-2';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -49,6 +49,12 @@ export default function GexCharmChart({
   zoomPct = 0.02,
 }: GexCharmChartProps) {
   const chartRef = useRef<any>(null);
+  const [showExtraMetrics, setShowExtraMetrics] = useState({
+    totalAboveSpot: false,
+    totalBelowSpot: false,
+    callPutRatio: false,
+    distanceToFlip: false,
+  });
 
   if (!data || data.length === 0) {
     return (
@@ -110,8 +116,8 @@ export default function GexCharmChart({
     if (flipIndex !== -1) {
       annotations.gammaFlip = {
         type: 'line',
-        yMin: flipIndex,
-        yMax: flipIndex,
+        xMin: flipIndex,
+        xMax: flipIndex,
         borderColor: '#fbbf24',
         borderWidth: 3,
         borderDash: [10, 5],
@@ -134,8 +140,8 @@ export default function GexCharmChart({
     if (wallIndex !== -1) {
       annotations.callWall = {
         type: 'line',
-        yMin: wallIndex,
-        yMax: wallIndex,
+        xMin: wallIndex,
+        xMax: wallIndex,
         borderColor: '#8b5cf6',
         borderWidth: 2,
         borderDash: [5, 5],
@@ -155,8 +161,8 @@ export default function GexCharmChart({
     if (wallIndex !== -1) {
       annotations.putWall = {
         type: 'line',
-        yMin: wallIndex,
-        yMax: wallIndex,
+        xMin: wallIndex,
+        xMax: wallIndex,
         borderColor: '#ef4444',
         borderWidth: 2,
         borderDash: [5, 5],
@@ -172,7 +178,7 @@ export default function GexCharmChart({
   }
 
   const options: ChartOptions<'bar'> = {
-    indexAxis: 'y' as const,
+    indexAxis: 'x' as const,
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -201,7 +207,7 @@ export default function GexCharmChart({
         callbacks: {
           label: function (context) {
             const label = context.dataset.label || '';
-            const value = context.parsed.x;
+            const value = context.parsed.y;
             return `${label}: ${value.toFixed(2)}`;
           },
         },
@@ -209,6 +215,19 @@ export default function GexCharmChart({
     },
     scales: {
       x: {
+        grid: {
+          color: '#374151',
+        },
+        ticks: {
+          color: '#9ca3af',
+        },
+        title: {
+          display: true,
+          text: 'Strike',
+          color: '#e5e7eb',
+        },
+      },
+      y: {
         stacked: false,
         grid: {
           color: '#374151',
@@ -222,29 +241,139 @@ export default function GexCharmChart({
           color: '#e5e7eb',
         },
       },
-      y: {
-        reverse: true,
-        grid: {
-          color: '#374151',
-        },
-        ticks: {
-          color: '#9ca3af',
-        },
-        title: {
-          display: true,
-          text: 'Strike',
-          color: '#e5e7eb',
-        },
-      },
     },
   };
+
+  // Cálculo de métricas adicionales
+  const totalAboveSpot = filteredData
+    .filter((d) => d.K > spot)
+    .reduce((sum, d) => sum + d[valueType], 0);
+
+  const totalBelowSpot = filteredData
+    .filter((d) => d.K <= spot)
+    .reduce((sum, d) => sum + d[valueType], 0);
+
+  const totalCallGex = filteredData
+    .filter((d) => d.side === 'C')
+    .reduce((sum, d) => sum + d[valueType], 0);
+
+  const totalPutGex = filteredData
+    .filter((d) => d.side === 'P')
+    .reduce((sum, d) => sum + d[valueType], 0);
+
+  const callPutRatio = totalPutGex !== 0 ? totalCallGex / totalPutGex : 0;
+
+  const distanceToFlip = gammaFlip ? ((gammaFlip - spot) / spot) * 100 : null;
+
+  const formatLargeNumber = (num: number) => {
+    if (num >= 1e9) return `${(num / 1e9).toFixed(2)}B`;
+    if (num >= 1e6) return `${(num / 1e6).toFixed(2)}M`;
+    if (num >= 1e3) return `${(num / 1e3).toFixed(2)}K`;
+    return num.toFixed(0);
+  };
+
+  // Agregar anotaciones opcionales a la gráfica
+  if (showExtraMetrics.totalAboveSpot) {
+    const aboveSpotIndex = strikes.findIndex(s => s > spot);
+    if (aboveSpotIndex !== -1) {
+      annotations.aboveSpot = {
+        type: 'box',
+        xMin: aboveSpotIndex - 0.5,
+        xMax: strikes.length - 0.5,
+        backgroundColor: 'rgba(96, 165, 250, 0.1)',
+        borderWidth: 0,
+        label: {
+          display: true,
+          content: `↑ ${formatLargeNumber(totalAboveSpot)}`,
+          position: { x: 'end', y: 'start' },
+          backgroundColor: '#60a5fa',
+          color: '#fff',
+          font: { size: 11, weight: 'bold' },
+        },
+      };
+    }
+  }
+
+  if (showExtraMetrics.totalBelowSpot) {
+    const belowSpotIndex = strikes.findIndex(s => s >= spot);
+    if (belowSpotIndex !== -1) {
+      annotations.belowSpot = {
+        type: 'box',
+        xMin: -0.5,
+        xMax: belowSpotIndex - 0.5,
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        borderWidth: 0,
+        label: {
+          display: true,
+          content: `↓ ${formatLargeNumber(totalBelowSpot)}`,
+          position: { x: 'start', y: 'start' },
+          backgroundColor: '#ef4444',
+          color: '#fff',
+          font: { size: 11, weight: 'bold' },
+        },
+      };
+    }
+  }
 
   return (
     <Card sx={{ bgcolor: 'background.paper', p: 2 }}>
       <CardContent>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <FormGroup row>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={showExtraMetrics.totalAboveSpot}
+                  onChange={(e) =>
+                    setShowExtraMetrics({ ...showExtraMetrics, totalAboveSpot: e.target.checked })
+                  }
+                  size="small"
+                />
+              }
+              label="Zona Superior"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={showExtraMetrics.totalBelowSpot}
+                  onChange={(e) =>
+                    setShowExtraMetrics({ ...showExtraMetrics, totalBelowSpot: e.target.checked })
+                  }
+                  size="small"
+                />
+              }
+              label="Zona Inferior"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={showExtraMetrics.callPutRatio}
+                  onChange={(e) =>
+                    setShowExtraMetrics({ ...showExtraMetrics, callPutRatio: e.target.checked })
+                  }
+                  size="small"
+                />
+              }
+              label={`Ratio: ${callPutRatio.toFixed(2)}`}
+            />
+            {gammaFlip && valueType === 'GEX' && distanceToFlip !== null && (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={showExtraMetrics.distanceToFlip}
+                    onChange={(e) =>
+                      setShowExtraMetrics({ ...showExtraMetrics, distanceToFlip: e.target.checked })
+                    }
+                    size="small"
+                  />
+                }
+                label={`Flip: ${distanceToFlip > 0 ? '+' : ''}${distanceToFlip.toFixed(1)}%`}
+              />
+            )}
+          </FormGroup>
           <ExportChartButton chartRef={chartRef} filename={`${ticker}_${valueType}`} />
         </Box>
+
         <Box sx={{ height: 600 }}>
           <Bar ref={chartRef} data={chartData} options={options} />
         </Box>

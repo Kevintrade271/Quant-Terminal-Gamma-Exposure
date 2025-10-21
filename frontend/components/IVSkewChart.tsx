@@ -1,8 +1,8 @@
 'use client';
 
-import { Card, CardContent, Typography, Box } from '@mui/material';
+import { Card, CardContent, Typography, Box, FormControlLabel, Checkbox, FormGroup } from '@mui/material';
 import { Line } from 'react-chartjs-2';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -33,6 +33,11 @@ interface IVSkewChartProps {
 
 export default function IVSkewChart({ data }: IVSkewChartProps) {
   const chartRef = useRef<any>(null);
+  const [showExtraMetrics, setShowExtraMetrics] = useState({
+    skewAnalysis: false,
+    mispricing: false,
+    opportunities: false,
+  });
 
   if (!data || !data.data || data.data.length === 0) {
     return (
@@ -147,12 +152,77 @@ export default function IVSkewChart({ data }: IVSkewChartProps) {
     },
   };
 
+  // Cálculo de métricas adicionales
+  const atmMoneyness = 1.0;
+  const atmCall = callsData.find((d) => Math.abs(d.moneyness - atmMoneyness) < 0.05);
+  const atmPut = putsData.find((d) => Math.abs(d.moneyness - atmMoneyness) < 0.05);
+
+  const atmCallIV = atmCall ? atmCall.iv * 100 : 0;
+  const atmPutIV = atmPut ? atmPut.iv * 100 : 0;
+
+  // Skew = diferencia entre OTM put IV y ATM IV
+  const otmPut = putsData.find((d) => d.moneyness < 0.95);
+  const putSkew = otmPut ? (otmPut.iv * 100 - atmPutIV) : 0;
+
+  // Diferencia call-put skew
+  const callPutDiff = Math.abs(atmCallIV - atmPutIV);
+
+  // Contar oportunidades (donde IV está muy por encima/debajo de ATM)
+  const avgCallIV = callsData.reduce((sum, d) => sum + d.iv * 100, 0) / callsData.length;
+  const avgPutIV = putsData.reduce((sum, d) => sum + d.iv * 100, 0) / putsData.length;
+  const opportunityCount = expData.filter((d) => {
+    const iv = d.iv * 100;
+    const avg = d.side === 'calls' ? avgCallIV : avgPutIV;
+    return Math.abs(iv - avg) > avg * 0.15; // 15% desviación
+  }).length;
+
+  const formatPercent = (num: number) => `${num.toFixed(2)}%`;
+
   return (
     <Card sx={{ bgcolor: 'background.paper', p: 2 }}>
       <CardContent>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <FormGroup row>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={showExtraMetrics.skewAnalysis}
+                  onChange={(e) =>
+                    setShowExtraMetrics({ ...showExtraMetrics, skewAnalysis: e.target.checked })
+                  }
+                  size="small"
+                />
+              }
+              label={`Put Skew: ${putSkew > 0 ? '+' : ''}${formatPercent(putSkew)}`}
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={showExtraMetrics.mispricing}
+                  onChange={(e) =>
+                    setShowExtraMetrics({ ...showExtraMetrics, mispricing: e.target.checked })
+                  }
+                  size="small"
+                />
+              }
+              label={`C-P Diff: ${formatPercent(callPutDiff)}`}
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={showExtraMetrics.opportunities}
+                  onChange={(e) =>
+                    setShowExtraMetrics({ ...showExtraMetrics, opportunities: e.target.checked })
+                  }
+                  size="small"
+                />
+              }
+              label={`Oportunidades: ${opportunityCount}`}
+            />
+          </FormGroup>
           <ExportChartButton chartRef={chartRef} filename={`${data.ticker}_IVSkew`} />
         </Box>
+
         <Box sx={{ height: 500 }}>
           <Line ref={chartRef} data={chartData} options={options} />
         </Box>

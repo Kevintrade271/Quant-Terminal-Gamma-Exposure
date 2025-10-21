@@ -13,7 +13,7 @@ async def get_volatility(
     max_exp: int = Query(default=15, ge=1, le=30),
     strike_span: float = Query(default=0.10, ge=0.05, le=0.30),
     max_cols: int = Query(default=40, ge=10, le=100),
-    min_oi: int = Query(default=100, ge=0)
+    min_oi: int = Query(default=10, ge=0)
 ):
     try:
         pivot_df, spot = load_and_build_matrix(

@@ -35,7 +35,7 @@ def load_and_build_matrix(
     max_exp: int = 15,
     strike_span: float = 0.10,
     max_cols: int = 40,
-    min_oi: int = 100
+    min_oi: int = 10
 ) -> Tuple[pd.DataFrame, float]:
     tk = yf.Ticker(ticker)
     try:

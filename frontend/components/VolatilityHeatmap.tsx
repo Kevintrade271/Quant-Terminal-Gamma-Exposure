@@ -1,7 +1,7 @@
 'use client';
 
-import { Card, CardContent, Typography, Box } from '@mui/material';
-import { useRef } from 'react';
+import { Card, CardContent, Typography, Box, FormControlLabel, Checkbox, FormGroup } from '@mui/material';
+import { useRef, useState } from 'react';
 import type { VolatilityResponse } from '@/lib/types';
 import ExportChartButton from './ExportChartButton';
 
@@ -11,6 +11,12 @@ interface VolatilityHeatmapProps {
 
 export default function VolatilityHeatmap({ data }: VolatilityHeatmapProps) {
   const heatmapRef = useRef<HTMLDivElement>(null);
+  const [showExtraMetrics, setShowExtraMetrics] = useState({
+    extremeVolatility: false,
+    averageComparison: false,
+    unusualStrikes: false,
+  });
+
   if (!data || !data.matrix || Object.keys(data.matrix).length === 0) {
     return (
       <Card sx={{ bgcolor: 'background.paper', p: 2 }}>
@@ -28,10 +34,7 @@ export default function VolatilityHeatmap({ data }: VolatilityHeatmapProps) {
   expirations.forEach((exp) => {
     Object.keys(data.matrix[exp]).forEach((strike) => allStrikes.add(strike));
   });
-  const strikes = Array.from(allStrikes)
-    .map(Number)
-    .sort((a, b) => a - b)
-    .map(String);
+  const strikes = Array.from(allStrikes).sort((a, b) => parseFloat(a) - parseFloat(b));
 
   const getColorScale = (vixZscore: number) => {
     if (vixZscore > 0.5) return 'Greens';
@@ -62,14 +65,78 @@ export default function VolatilityHeatmap({ data }: VolatilityHeatmapProps) {
 
   const colorTheme = getColorTheme(data.vix_zscore);
 
+  // Cálculo de métricas adicionales
+  const allValues: number[] = [];
+  expirations.forEach((exp) => {
+    strikes.forEach((strike) => {
+      const value = data.matrix[exp]?.[strike];
+      if (value !== null && value !== undefined) {
+        allValues.push(value * 100);
+      }
+    });
+  });
+
+  const avgIV = allValues.length > 0 ? allValues.reduce((a, b) => a + b, 0) / allValues.length : 0;
+  const maxIV = allValues.length > 0 ? Math.max(...allValues) : 0;
+  const minIV = allValues.length > 0 ? Math.min(...allValues) : 0;
+
+  // Strikes con IV inusual (> 1.5 desviaciones estándar de la media)
+  const stdDev = Math.sqrt(
+    allValues.reduce((sum, val) => sum + Math.pow(val - avgIV, 2), 0) / allValues.length
+  );
+  const unusualThreshold = avgIV + 1.5 * stdDev;
+  const extremeCount = allValues.filter((v) => v > unusualThreshold).length;
+
+  const formatPercent = (num: number) => `${num.toFixed(2)}%`;
+
   return (
     <Card sx={{ bgcolor: 'background.paper', p: 2 }}>
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h5" color="text.primary">
-            {data.ticker} Volatility | Spot: ${data.spot.toFixed(2)} | VIX Z: {data.vix_zscore >= 0 ? '+' : ''}
-            {data.vix_zscore.toFixed(2)} ({colorTheme})
-          </Typography>
+          <Box>
+            <Typography variant="h6" color="text.primary">
+              {data.ticker} Volatility | Spot: ${data.spot.toFixed(2)} | VIX Z: {data.vix_zscore >= 0 ? '+' : ''}
+              {data.vix_zscore.toFixed(2)} ({colorTheme})
+            </Typography>
+            <FormGroup row>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={showExtraMetrics.extremeVolatility}
+                    onChange={(e) =>
+                      setShowExtraMetrics({ ...showExtraMetrics, extremeVolatility: e.target.checked })
+                    }
+                    size="small"
+                  />
+                }
+                label={`Max IV: ${formatPercent(maxIV)}`}
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={showExtraMetrics.averageComparison}
+                    onChange={(e) =>
+                      setShowExtraMetrics({ ...showExtraMetrics, averageComparison: e.target.checked })
+                    }
+                    size="small"
+                  />
+                }
+                label={`Avg: ${formatPercent(avgIV)}`}
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={showExtraMetrics.unusualStrikes}
+                    onChange={(e) =>
+                      setShowExtraMetrics({ ...showExtraMetrics, unusualStrikes: e.target.checked })
+                    }
+                    size="small"
+                  />
+                }
+                label={`Inusuales: ${extremeCount}`}
+              />
+            </FormGroup>
+          </Box>
           <ExportChartButton elementRef={heatmapRef} filename={`${data.ticker}_Volatility`} />
         </Box>
 
@@ -126,11 +193,22 @@ export default function VolatilityHeatmap({ data }: VolatilityHeatmapProps) {
                   {strikes.map((strike) => {
                     const value = data.matrix[exp]?.[strike];
                     const displayValue = value !== null && value !== undefined ? (value * 100).toFixed(2) : '-';
-                    const bgColor =
+                    let bgColor =
                       value !== null && value !== undefined
                         ? getBackgroundColor(value * 100, data.vix_zscore)
                         : '#1f2937';
                     const textColor = value !== null && value !== undefined && value * 100 > 30 ? '#111827' : '#f9fafb';
+
+                    // Highlight based on checkboxes
+                    const ivValue = value !== null && value !== undefined ? value * 100 : 0;
+                    const isExtreme = showExtraMetrics.extremeVolatility && ivValue >= maxIV * 0.95;
+                    const isUnusual = showExtraMetrics.unusualStrikes && ivValue > unusualThreshold;
+
+                    if (isExtreme) {
+                      bgColor = '#dc2626';
+                    } else if (isUnusual) {
+                      bgColor = '#f59e0b';
+                    }
 
                     return (
                       <td
@@ -141,7 +219,8 @@ export default function VolatilityHeatmap({ data }: VolatilityHeatmapProps) {
                           textAlign: 'center',
                           backgroundColor: bgColor,
                           color: textColor,
-                          fontWeight: 500,
+                          fontWeight: isExtreme || isUnusual ? 700 : 500,
+                          boxShadow: isExtreme ? '0 0 10px rgba(220, 38, 38, 0.5)' : isUnusual ? '0 0 8px rgba(245, 158, 11, 0.5)' : 'none',
                         }}
                       >
                         {displayValue}

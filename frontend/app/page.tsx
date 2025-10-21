@@ -12,10 +12,6 @@ import {
   CircularProgress,
   Alert,
   ThemeProvider,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   Switch,
   FormControlLabel,
   IconButton,
@@ -30,6 +26,7 @@ import GexCharmChart from '@/components/GexCharmChart';
 import VolatilityHeatmap from '@/components/VolatilityHeatmap';
 import IVSkewChart from '@/components/IVSkewChart';
 import AdvancedAnalyticsView from '@/components/AdvancedAnalyticsView';
+import TickerCard from '@/components/TickerCard';
 
 const REFRESH_INTERVAL = 5 * 60 * 1000;
 
@@ -49,6 +46,11 @@ export default function Dashboard() {
   const loadData = async () => {
     try {
       setError(null);
+
+      setGreeksData(null);
+      setVolatilityData(null);
+      setIvSkewData(null);
+      setAdvancedData(null);
 
       if (activeTab === 'gex-charm') {
         const [greeks, status] = await Promise.all([
@@ -110,85 +112,113 @@ export default function Dashboard() {
         }}
       >
         <Container maxWidth="xl">
-          <Typography
-            variant="h3"
-            component="h1"
-            gutterBottom
+          <Box
             sx={{
-              textAlign: 'center',
-              color: 'text.primary',
-              fontWeight: 700,
-              mb: 2,
+              display: 'flex',
+              flexDirection: { xs: 'column', md: 'row' },
+              justifyContent: 'space-between',
+              alignItems: { xs: 'flex-start', md: 'center' },
+              gap: 2,
+              mb: 3,
             }}
           >
-            🎯 Quant Terminal - Dashboard Unificado
-          </Typography>
+            <Typography
+              variant="h3"
+              component="h1"
+              sx={{
+                color: 'text.primary',
+                fontWeight: 700,
+                fontSize: { xs: '1.75rem', md: '3rem' },
+              }}
+            >
+              🎯 GammaVision
+            </Typography>
 
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 3, mb: 3 }}>
-            <FormControl sx={{ minWidth: 200 }}>
-              <InputLabel id="ticker-select-label">Ticker</InputLabel>
-              <Select
-                labelId="ticker-select-label"
-                value={ticker}
-                label="Ticker"
-                onChange={(e) => {
-                  setTicker(e.target.value);
-                  setLoading(true);
-                }}
-              >
-                {AVAILABLE_TICKERS.map((t) => (
-                  <MenuItem key={t.value} value={t.value}>
-                    {t.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={odteMode}
-                  onChange={(e) => {
-                    setOdteMode(e.target.checked);
-                    setLoading(true);
-                  }}
-                />
-              }
-              label="Modo ODTE"
-            />
-
-            <Tooltip title="Actualizar datos manualmente">
-              <IconButton
-                onClick={() => {
-                  setLoading(true);
-                  loadData();
-                }}
-                disabled={loading}
-                sx={{
-                  color: 'primary.main',
-                  '&:hover': {
-                    backgroundColor: 'rgba(96, 165, 250, 0.1)',
-                  },
-                }}
-              >
-                <RefreshIcon />
-              </IconButton>
-            </Tooltip>
-          </Box>
-
-          {statusData && (
-            <Card sx={{ mb: 3, bgcolor: 'background.paper' }}>
-              <CardContent>
-                <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center' }}>
-                  ✅ Última Actualización:{' '}
-                  {lastUpdate ? lastUpdate.toLocaleTimeString('es-ES') : 'Cargando...'} | Spot: $
-                  {statusData.spot.toFixed(2)} | VIX: {statusData.vix_current.toFixed(2)} (Z:{' '}
+            {statusData && (
+              <Card sx={{ bgcolor: 'background.paper', px: 3, py: 1.5, width: { xs: '100%', md: 'auto' } }}>
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                  ✅ Última Actualización: {lastUpdate ? lastUpdate.toLocaleTimeString('es-ES') : 'Cargando...'}
+                </Typography>
+                <Typography variant="body2" color="text.primary" sx={{ fontWeight: 600, mt: 0.5 }}>
+                  Spot: ${statusData.spot.toFixed(2)} | VIX: {statusData.vix_current.toFixed(2)} (Z:{' '}
                   {statusData.vix_zscore >= 0 ? '+' : ''}
                   {statusData.vix_zscore.toFixed(2)})
                 </Typography>
-              </CardContent>
-            </Card>
-          )}
+              </Card>
+            )}
+          </Box>
+
+          <Box sx={{ mb: 4 }}>
+            <Typography
+              variant="h6"
+              sx={{
+                textAlign: 'center',
+                color: 'text.secondary',
+                mb: 2,
+                fontWeight: 600,
+              }}
+            >
+              Selecciona un Ticker
+            </Typography>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: 'repeat(2, 1fr)',
+                  sm: 'repeat(3, 1fr)',
+                  md: 'repeat(6, 1fr)',
+                },
+                gap: 2,
+                mb: 3,
+              }}
+            >
+              {AVAILABLE_TICKERS.map((t) => (
+                <TickerCard
+                  key={t.value}
+                  ticker={t.value}
+                  label={t.label}
+                  isSelected={ticker === t.value}
+                  onClick={() => {
+                    setTicker(t.value);
+                    setLoading(true);
+                  }}
+                />
+              ))}
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 3 }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={odteMode}
+                    onChange={(e) => {
+                      setOdteMode(e.target.checked);
+                      setLoading(true);
+                    }}
+                  />
+                }
+                label="Modo ODTE"
+              />
+
+              <Tooltip title="Actualizar datos manualmente">
+                <IconButton
+                  onClick={() => {
+                    setLoading(true);
+                    loadData();
+                  }}
+                  disabled={loading}
+                  sx={{
+                    color: 'primary.main',
+                    '&:hover': {
+                      backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                    },
+                  }}
+                >
+                  <RefreshIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </Box>
 
           {error && (
             <Alert severity="error" sx={{ mb: 3 }}>

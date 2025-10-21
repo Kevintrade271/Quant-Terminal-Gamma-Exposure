@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Quant Terminal - Dashboard Unificado",
-  description: "Gamma Exposure and Volatility Analysis Dashboard",
+  title: "GammaVision - Options Analytics Platform",
+  description: "Advanced Gamma Exposure and Volatility Analysis Dashboard for Options Trading",
 };
 
 export default function RootLayout({

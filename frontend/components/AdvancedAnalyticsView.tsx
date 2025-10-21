@@ -1,8 +1,8 @@
 'use client';
 
-import { Card, CardContent, Typography, Box } from '@mui/material';
+import { Card, CardContent, Typography, Box, FormControlLabel, Checkbox, FormGroup } from '@mui/material';
 import { Line } from 'react-chartjs-2';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -36,6 +36,11 @@ interface AdvancedAnalyticsViewProps {
 
 export default function AdvancedAnalyticsView({ data }: AdvancedAnalyticsViewProps) {
   const chartRef = useRef<any>(null);
+  const [showExtraMetrics, setShowExtraMetrics] = useState({
+    levelTrends: false,
+    gammaFlipHistory: false,
+    alerts: false,
+  });
 
   if (!data || !data.net_gamma_profile) {
     return (
@@ -237,8 +242,157 @@ export default function AdvancedAnalyticsView({ data }: AdvancedAnalyticsViewPro
     },
   };
 
+  const totalCallGex = data.gamma_levels.call_wall_gex;
+  const totalPutGex = Math.abs(data.gamma_levels.put_wall_gex);
+  const netGex = totalCallGex - totalPutGex;
+  const gexRatio = totalPutGex > 0 ? (totalCallGex / totalPutGex) : 0;
+
+  const formatLargeNumber = (num: number) => {
+    if (num >= 1e9) return `${(num / 1e9).toFixed(2)}B`;
+    if (num >= 1e6) return `${(num / 1e6).toFixed(2)}M`;
+    if (num >= 1e3) return `${(num / 1e3).toFixed(2)}K`;
+    return num.toFixed(0);
+  };
+
+  // Métricas adicionales
+  const gammaFlipDistance = data.gamma_levels.gamma_flip ? ((data.gamma_levels.gamma_flip - spot) / spot) * 100 : null;
+
+  // Detectar alertas
+  const alerts: string[] = [];
+  if (operational_levels.slip_risk && spot > operational_levels.slip_risk * 0.99) {
+    alerts.push('Cerca de Slip Risk');
+  }
+  if (operational_levels.exhaustion && spot < operational_levels.exhaustion * 1.01) {
+    alerts.push('Cerca de Exhaustion');
+  }
+  if (gexRatio < 0.5) {
+    alerts.push('Put Wall muy dominante');
+  }
+  if (gexRatio > 2) {
+    alerts.push('Call Wall muy dominante');
+  }
+
+  // Tendencia de niveles (simulado - normalmente vendría del backend)
+  const levelTrend = gammaFlipDistance && gammaFlipDistance > 0 ? 'Alcista' : 'Bajista';
+
   return (
     <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', mb: 2, gap: 2 }}>
+        <FormGroup row>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={showExtraMetrics.levelTrends}
+                onChange={(e) =>
+                  setShowExtraMetrics({ ...showExtraMetrics, levelTrends: e.target.checked })
+                }
+                size="small"
+              />
+            }
+            label={`Tendencia: ${levelTrend}`}
+          />
+          {gammaFlipDistance !== null && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={showExtraMetrics.gammaFlipHistory}
+                  onChange={(e) =>
+                    setShowExtraMetrics({ ...showExtraMetrics, gammaFlipHistory: e.target.checked })
+                  }
+                  size="small"
+                />
+              }
+              label={`Flip: ${gammaFlipDistance > 0 ? '+' : ''}${gammaFlipDistance.toFixed(1)}%`}
+            />
+          )}
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={showExtraMetrics.alerts}
+                onChange={(e) =>
+                  setShowExtraMetrics({ ...showExtraMetrics, alerts: e.target.checked })
+                }
+                size="small"
+              />
+            }
+            label={`Alertas: ${alerts.length}`}
+          />
+        </FormGroup>
+      </Box>
+
+      {showExtraMetrics.alerts && alerts.length > 0 && (
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ color: '#ef4444', fontWeight: 600 }}>
+            🚨 {alerts.join(' | ')}
+          </Typography>
+        </Box>
+      )}
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
+        <Card sx={{ bgcolor: 'background.paper' }}>
+          <CardContent>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+              Call Wall GEX
+            </Typography>
+            <Typography variant="h5" color="primary.main" sx={{ fontWeight: 700, mt: 0.5 }}>
+              {formatLargeNumber(totalCallGex)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              @ ${data.gamma_levels.call_wall.toFixed(2)}
+            </Typography>
+          </CardContent>
+        </Card>
+
+        <Card sx={{ bgcolor: 'background.paper' }}>
+          <CardContent>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+              Put Wall GEX
+            </Typography>
+            <Typography variant="h5" color="error.main" sx={{ fontWeight: 700, mt: 0.5 }}>
+              {formatLargeNumber(totalPutGex)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              @ ${data.gamma_levels.put_wall.toFixed(2)}
+            </Typography>
+          </CardContent>
+        </Card>
+
+        <Card sx={{ bgcolor: 'background.paper' }}>
+          <CardContent>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+              Net GEX
+            </Typography>
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: 700,
+                mt: 0.5,
+                color: netGex > 0 ? 'primary.main' : 'error.main',
+              }}
+            >
+              {netGex > 0 ? '+' : ''}{formatLargeNumber(netGex)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {netGex > 0 ? 'Call dominante' : 'Put dominante'}
+            </Typography>
+          </CardContent>
+        </Card>
+
+        <Card sx={{ bgcolor: 'background.paper' }}>
+          <CardContent>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+              Call/Put Ratio
+            </Typography>
+            <Typography variant="h5" color="text.primary" sx={{ fontWeight: 700, mt: 0.5 }}>
+              {gexRatio.toFixed(2)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {gexRatio > 1 ? 'Bullish' : gexRatio < 1 ? 'Bearish' : 'Neutral'}
+            </Typography>
+          </CardContent>
+        </Card>
+      </Box>
+
       <Box sx={{ mb: 3 }}>
         <Card sx={{ bgcolor: 'background.paper', p: 2 }}>
           <CardContent>
@@ -249,8 +403,8 @@ export default function AdvancedAnalyticsView({ data }: AdvancedAnalyticsViewPro
               <Line ref={chartRef} data={chartData} options={options} />
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
-              El Net Gamma Profile muestra la exposición gamma neta continua. Las zonas positivas amplifican movimientos,
-              las negativas los suavizan.
+              El Net Gamma Profile muestra la exposición gamma neta continua. Las zonas positivas indican donde los dealers amplifican movimientos,
+              las negativas donde los suavizan.
             </Typography>
           </CardContent>
         </Card>
