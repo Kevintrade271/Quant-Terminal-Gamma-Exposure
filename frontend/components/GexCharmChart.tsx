@@ -57,6 +57,7 @@ export default function GexCharmChart({
     netGexOverlay: false,
     gexSkew: false,
     supportResistanceZones: false,
+    charmDecayProjection: false,
   });
 
   if (!data || data.length === 0) {
@@ -214,6 +215,33 @@ export default function GexCharmChart({
       pointBorderWidth: 2,
       yAxisID: 'y1',
       tension: 0.2,
+    });
+  }
+
+  // CHARM Decay Projections
+  if (showEnhancedMetrics.charmDecayProjection && valueType === 'CHARM') {
+    const decayRates = [
+      { hours: 1, label: '1h', color: '#60a5fa', dash: [5, 5] },
+      { hours: 4, label: '4h', color: '#f59e0b', dash: [10, 5] },
+      { hours: 24, label: '1d', color: '#ef4444', dash: [15, 10] }
+    ];
+
+    decayRates.forEach(({ hours, label, color, dash }) => {
+      const decayFactor = 1 - (hours / 24); // Aproximación simple de decay
+      const projectedData = callsData.map((val, idx) => val * decayFactor);
+
+      datasets.push({
+        label: `CHARM Proyección ${label}`,
+        data: projectedData,
+        type: 'line' as const,
+        borderColor: color,
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        borderDash: dash,
+        pointRadius: 0,
+        tension: 0.3,
+        yAxisID: 'y',
+      });
     });
   }
 
@@ -486,6 +514,24 @@ export default function GexCharmChart({
                   label={<Typography sx={{ fontSize: '0.875rem', fontWeight: 500 }}>Zonas S/R</Typography>}
                 />
               </>
+            )}
+            {valueType === 'CHARM' && (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={showEnhancedMetrics.charmDecayProjection}
+                    onChange={(e) =>
+                      setShowEnhancedMetrics({ ...showEnhancedMetrics, charmDecayProjection: e.target.checked })
+                    }
+                    size="small"
+                    sx={{
+                      color: '#60a5fa',
+                      '&.Mui-checked': { color: '#60a5fa' }
+                    }}
+                  />
+                }
+                label={<Typography sx={{ fontSize: '0.875rem', fontWeight: 500 }}>Proyección Decay (1h/4h/1d)</Typography>}
+              />
             )}
           </FormGroup>
           <ExportChartButton chartRef={chartRef} filename={`${ticker}_${valueType}`} />

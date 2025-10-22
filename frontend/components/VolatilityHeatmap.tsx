@@ -4,6 +4,7 @@ import { Card, CardContent, Typography, Box, FormControlLabel, Checkbox, FormGro
 import { useRef, useState } from 'react';
 import type { VolatilityResponse } from '@/lib/types';
 import ExportChartButton from './ExportChartButton';
+import IVTermStructure from './IVTermStructure';
 
 interface VolatilityHeatmapProps {
   data: VolatilityResponse;
@@ -12,9 +13,9 @@ interface VolatilityHeatmapProps {
 export default function VolatilityHeatmap({ data }: VolatilityHeatmapProps) {
   const heatmapRef = useRef<HTMLDivElement>(null);
   const [showExtraMetrics, setShowExtraMetrics] = useState({
+    ivTermStructure: true,
     extremeVolatility: false,
     averageComparison: false,
-    unusualStrikes: false,
   });
 
   if (!data || !data.matrix || Object.keys(data.matrix).length === 0) {
@@ -90,6 +91,7 @@ export default function VolatilityHeatmap({ data }: VolatilityHeatmapProps) {
   const formatPercent = (num: number) => `${num.toFixed(2)}%`;
 
   return (
+    <>
     <Card sx={{ bgcolor: 'background.paper', p: 2 }}>
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -234,5 +236,7 @@ export default function VolatilityHeatmap({ data }: VolatilityHeatmapProps) {
         </Box>
       </CardContent>
     </Card>
+    {showExtraMetrics.ivTermStructure && <IVTermStructure data={data} />}
+    </>
   );
 }
