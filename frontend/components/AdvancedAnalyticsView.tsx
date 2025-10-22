@@ -37,9 +37,7 @@ interface AdvancedAnalyticsViewProps {
 export default function AdvancedAnalyticsView({ data }: AdvancedAnalyticsViewProps) {
   const chartRef = useRef<any>(null);
   const [showExtraMetrics, setShowExtraMetrics] = useState({
-    levelTrends: false,
-    gammaFlipHistory: false,
-    alerts: false,
+    gammaProjections: true, // Show projections by default
   });
 
   if (!data || !data.net_gamma_profile) {
@@ -275,57 +273,112 @@ export default function AdvancedAnalyticsView({ data }: AdvancedAnalyticsViewPro
   // Tendencia de niveles (simulado - normalmente vendría del backend)
   const levelTrend = gammaFlipDistance && gammaFlipDistance > 0 ? 'Alcista' : 'Bajista';
 
+  // Gamma Profile Projections: Calculate Net GEX at different price levels
+  const calculateNetGexAtPrice = (targetPrice: number): number => {
+    const { strikes, net_gamma } = net_gamma_profile;
+    // Find closest strike to target price
+    const closestIndex = strikes.reduce((prevIdx, currStrike, currIdx) => {
+      return Math.abs(currStrike - targetPrice) < Math.abs(strikes[prevIdx] - targetPrice) ? currIdx : prevIdx;
+    }, 0);
+    return net_gamma[closestIndex];
+  };
+
+  const projections = [
+    { label: '-10%', price: spot * 0.90, percent: -10 },
+    { label: '-5%', price: spot * 0.95, percent: -5 },
+    { label: '-2%', price: spot * 0.98, percent: -2 },
+    { label: 'Spot', price: spot, percent: 0 },
+    { label: '+2%', price: spot * 1.02, percent: 2 },
+    { label: '+5%', price: spot * 1.05, percent: 5 },
+    { label: '+10%', price: spot * 1.10, percent: 10 },
+  ].map(proj => ({
+    ...proj,
+    netGex: calculateNetGexAtPrice(proj.price),
+  }));
+
+  // Determine which direction has more resistance/support based on GEX
+  const upside5 = projections.find(p => p.percent === 5)?.netGex || 0;
+  const downside5 = projections.find(p => p.percent === -5)?.netGex || 0;
+  const projectionBias = upside5 > Math.abs(downside5) ? 'Resistencia al alza' : 'Soporte a la baja';
+
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', mb: 2, gap: 2 }}>
-        <FormGroup row>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <Typography variant="body2" sx={{ color: '#9ca3af' }}>
+            Tendencia: {levelTrend}
+            {gammaFlipDistance !== null && ` | Flip: ${gammaFlipDistance > 0 ? '+' : ''}${gammaFlipDistance.toFixed(1)}%`}
+            {alerts.length > 0 && ` | 🚨 ${alerts.join(', ')}`}
+          </Typography>
           <FormControlLabel
             control={
               <Checkbox
-                checked={showExtraMetrics.levelTrends}
+                checked={showExtraMetrics.gammaProjections}
                 onChange={(e) =>
-                  setShowExtraMetrics({ ...showExtraMetrics, levelTrends: e.target.checked })
+                  setShowExtraMetrics({ ...showExtraMetrics, gammaProjections: e.target.checked })
                 }
                 size="small"
+                sx={{
+                  color: '#8b5cf6',
+                  '&.Mui-checked': { color: '#8b5cf6' }
+                }}
               />
             }
-            label={`Tendencia: ${levelTrend}`}
+            label={<Typography sx={{ fontSize: '0.875rem', fontWeight: 500 }}>Proyecciones GEX</Typography>}
           />
-          {gammaFlipDistance !== null && (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={showExtraMetrics.gammaFlipHistory}
-                  onChange={(e) =>
-                    setShowExtraMetrics({ ...showExtraMetrics, gammaFlipHistory: e.target.checked })
-                  }
-                  size="small"
-                />
-              }
-              label={`Flip: ${gammaFlipDistance > 0 ? '+' : ''}${gammaFlipDistance.toFixed(1)}%`}
-            />
-          )}
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={showExtraMetrics.alerts}
-                onChange={(e) =>
-                  setShowExtraMetrics({ ...showExtraMetrics, alerts: e.target.checked })
-                }
-                size="small"
-              />
-            }
-            label={`Alertas: ${alerts.length}`}
-          />
-        </FormGroup>
+        </Box>
       </Box>
 
-      {showExtraMetrics.alerts && alerts.length > 0 && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" sx={{ color: '#ef4444', fontWeight: 600 }}>
-            🚨 {alerts.join(' | ')}
+      {showExtraMetrics.gammaProjections && (
+        <Card sx={{ bgcolor: '#1f2937', mb: 3, p: 2, border: '2px solid #8b5cf6' }}>
+          <Typography variant="h6" sx={{ color: '#8b5cf6', fontWeight: 700, mb: 1 }}>
+            📊 Proyecciones de Gamma Profile
           </Typography>
-        </Box>
+          <Typography variant="body2" sx={{ color: '#9ca3af', mb: 2 }}>
+            Net GEX proyectado a diferentes niveles de precio. {projectionBias}.
+          </Typography>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1 }}>
+            {projections.map((proj, idx) => {
+              const isSpot = proj.percent === 0;
+              const color = proj.netGex > 0 ? '#10b981' : proj.netGex < 0 ? '#ef4444' : '#6b7280';
+              const bgColor = isSpot ? '#fbbf24' : '#374151';
+
+              return (
+                <Box
+                  key={idx}
+                  sx={{
+                    bgcolor: bgColor,
+                    p: 1.5,
+                    borderRadius: 1,
+                    textAlign: 'center',
+                    border: isSpot ? '2px solid #facc15' : `1px solid ${color}`,
+                  }}
+                >
+                  <Typography variant="caption" sx={{ color: isSpot ? '#1f2937' : '#e5e7eb', fontWeight: 700, display: 'block', mb: 0.5 }}>
+                    {proj.label}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: isSpot ? '#1f2937' : '#9ca3af', display: 'block', fontSize: '0.7rem' }}>
+                    ${proj.price.toFixed(2)}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: isSpot ? '#1f2937' : color, fontWeight: 700, mt: 0.5 }}>
+                    {formatLargeNumber(Math.abs(proj.netGex))}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: isSpot ? '#1f2937' : '#9ca3af', fontSize: '0.65rem' }}>
+                    {proj.netGex > 0 ? 'Call' : proj.netGex < 0 ? 'Put' : 'Neutral'}
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Box>
+
+          <Box sx={{ mt: 2, p: 1.5, bgcolor: '#374151', borderRadius: 1 }}>
+            <Typography variant="caption" sx={{ color: '#e5e7eb', fontWeight: 600 }}>
+              💡 Interpretación: Un Net GEX positivo alto indica que los dealers amplificarán movimientos alcistas (más volatilidad al subir).
+              Un Net GEX negativo alto indica que los dealers frenarán movimientos bajistas (menos volatilidad al bajar).
+            </Typography>
+          </Box>
+        </Card>
       )}
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>

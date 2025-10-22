@@ -35,7 +35,15 @@ export default function IVTermStructure({ data }: IVTermStructureProps) {
   const chartRef = useRef<any>(null);
 
   if (!data || !data.matrix || Object.keys(data.matrix).length === 0) {
-    return null;
+    return (
+      <Card sx={{ bgcolor: 'background.paper', p: 2, mt: 3 }}>
+        <CardContent>
+          <Typography variant="body2" color="text.secondary">
+            No hay datos suficientes para mostrar IV Term Structure
+          </Typography>
+        </CardContent>
+      </Card>
+    );
   }
 
   const expirations = Object.keys(data.matrix).sort();
@@ -66,6 +74,122 @@ export default function IVTermStructure({ data }: IVTermStructureProps) {
       dte: calculateDTE(exp)
     };
   }).filter(d => d.iv !== null);
+
+  // Si no hay datos ATM, mostrar análisis alternativo usando toda la superficie
+  if (atmData.length === 0 || avgData.length === 0) {
+    // Calcular distribución de IV global
+    const allIVs: number[] = [];
+    expirations.forEach(exp => {
+      Object.values(data.matrix[exp]).forEach(iv => {
+        if (iv !== null && iv !== undefined) {
+          allIVs.push(iv * 100);
+        }
+      });
+    });
+
+    if (allIVs.length === 0) {
+      return (
+        <Card sx={{ bgcolor: 'background.paper', p: 2, mt: 3 }}>
+          <CardContent>
+            <Typography variant="body2" color="text.secondary">
+              No hay datos de volatilidad para mostrar
+            </Typography>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    const minIV = Math.min(...allIVs);
+    const maxIV = Math.max(...allIVs);
+    const avgIV = allIVs.reduce((a, b) => a + b, 0) / allIVs.length;
+    const stdDev = Math.sqrt(allIVs.reduce((sum, iv) => sum + Math.pow(iv - avgIV, 2), 0) / allIVs.length);
+
+    // Crear histograma de distribución
+    const bins = 10;
+    const binSize = (maxIV - minIV) / bins;
+    const histogram = Array(bins).fill(0);
+    allIVs.forEach(iv => {
+      const binIndex = Math.min(Math.floor((iv - minIV) / binSize), bins - 1);
+      histogram[binIndex]++;
+    });
+
+    const histogramData = {
+      labels: Array.from({ length: bins }, (_, i) =>
+        `${(minIV + i * binSize).toFixed(1)}-${(minIV + (i + 1) * binSize).toFixed(1)}%`
+      ),
+      datasets: [{
+        label: 'Distribución de IV',
+        data: histogram,
+        backgroundColor: 'rgba(139, 92, 246, 0.6)',
+        borderColor: '#8b5cf6',
+        borderWidth: 2,
+      }]
+    };
+
+    const histogramOptions: ChartOptions<'line'> = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        title: {
+          display: true,
+          text: 'Distribución de Volatilidad Implícita',
+          color: '#e5e7eb',
+          font: { size: 14, weight: 'bold' },
+        },
+      },
+      scales: {
+        x: {
+          grid: { color: '#374151' },
+          ticks: { color: '#9ca3af', maxRotation: 45, minRotation: 45 },
+        },
+        y: {
+          grid: { color: '#374151' },
+          ticks: { color: '#9ca3af' },
+          title: { display: true, text: 'Frecuencia', color: '#e5e7eb' },
+        },
+      },
+    };
+
+    return (
+      <Card sx={{ bgcolor: 'background.paper', p: 2, mt: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" sx={{ color: 'text.primary', fontWeight: 600 }}>
+              📊 Análisis de Volatilidad (Superficie Completa)
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2, mb: 3 }}>
+            <Box sx={{ bgcolor: '#1f2937', p: 2, borderRadius: 1 }}>
+              <Typography variant="caption" sx={{ color: '#9ca3af' }}>IV Mínima</Typography>
+              <Typography variant="h6" sx={{ color: '#10b981', fontWeight: 700 }}>{minIV.toFixed(2)}%</Typography>
+            </Box>
+            <Box sx={{ bgcolor: '#1f2937', p: 2, borderRadius: 1 }}>
+              <Typography variant="caption" sx={{ color: '#9ca3af' }}>IV Promedio</Typography>
+              <Typography variant="h6" sx={{ color: '#60a5fa', fontWeight: 700 }}>{avgIV.toFixed(2)}%</Typography>
+            </Box>
+            <Box sx={{ bgcolor: '#1f2937', p: 2, borderRadius: 1 }}>
+              <Typography variant="caption" sx={{ color: '#9ca3af' }}>IV Máxima</Typography>
+              <Typography variant="h6" sx={{ color: '#ef4444', fontWeight: 700 }}>{maxIV.toFixed(2)}%</Typography>
+            </Box>
+            <Box sx={{ bgcolor: '#1f2937', p: 2, borderRadius: 1 }}>
+              <Typography variant="caption" sx={{ color: '#9ca3af' }}>Desv. Estándar</Typography>
+              <Typography variant="h6" sx={{ color: '#a855f7', fontWeight: 700 }}>{stdDev.toFixed(2)}%</Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ height: 300 }}>
+            <Line data={histogramData} options={histogramOptions} />
+          </Box>
+
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
+            Distribución de {allIVs.length} puntos de volatilidad implícita a través de {expirations.length} expiraciones
+          </Typography>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const chartData = {
     labels: atmData.map(d => `${d.dte}d`),

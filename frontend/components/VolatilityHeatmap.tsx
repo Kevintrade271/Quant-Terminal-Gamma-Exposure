@@ -13,7 +13,7 @@ interface VolatilityHeatmapProps {
 export default function VolatilityHeatmap({ data }: VolatilityHeatmapProps) {
   const heatmapRef = useRef<HTMLDivElement>(null);
   const [showExtraMetrics, setShowExtraMetrics] = useState({
-    ivTermStructure: true,
+    unusualStrikes: false,
     extremeVolatility: false,
     averageComparison: false,
   });
@@ -92,7 +92,7 @@ export default function VolatilityHeatmap({ data }: VolatilityHeatmapProps) {
 
   return (
     <>
-    <Card sx={{ bgcolor: 'background.paper', p: 2 }}>
+      <Card sx={{ bgcolor: 'background.paper', p: 2 }}>
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Box>
@@ -101,6 +101,18 @@ export default function VolatilityHeatmap({ data }: VolatilityHeatmapProps) {
               {data.vix_zscore.toFixed(2)} ({colorTheme})
             </Typography>
             <FormGroup row>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={showExtraMetrics.unusualStrikes}
+                    onChange={(e) =>
+                      setShowExtraMetrics({ ...showExtraMetrics, unusualStrikes: e.target.checked })
+                    }
+                    size="small"
+                  />
+                }
+                label={`Strikes Anormales: ${extremeCount}`}
+              />
               <FormControlLabel
                 control={
                   <Checkbox
@@ -124,18 +136,6 @@ export default function VolatilityHeatmap({ data }: VolatilityHeatmapProps) {
                   />
                 }
                 label={`Avg: ${formatPercent(avgIV)}`}
-              />
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={showExtraMetrics.unusualStrikes}
-                    onChange={(e) =>
-                      setShowExtraMetrics({ ...showExtraMetrics, unusualStrikes: e.target.checked })
-                    }
-                    size="small"
-                  />
-                }
-                label={`Inusuales: ${extremeCount}`}
               />
             </FormGroup>
           </Box>
@@ -235,8 +235,8 @@ export default function VolatilityHeatmap({ data }: VolatilityHeatmapProps) {
           </table>
         </Box>
       </CardContent>
-    </Card>
-    {showExtraMetrics.ivTermStructure && <IVTermStructure data={data} />}
+      </Card>
+      <IVTermStructure data={data} />
     </>
   );
 }
