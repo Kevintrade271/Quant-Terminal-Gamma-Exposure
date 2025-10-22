@@ -94,7 +94,36 @@ export interface AdvancedAnalyticsResponse {
   volume_by_strike: VolumeByStrike;
 }
 
-export type TabValue = 'gex-charm' | 'volatility' | 'iv-skew' | 'advanced';
+export interface GammaProfileData {
+  price_grid: number[];
+  profile: number[];
+}
+
+export interface WindowRange {
+  low: number;
+  high: number;
+}
+
+export interface GexEnhancedResponse {
+  spot: number;
+  ticker: string;
+  label: string;
+  strikes: number[];
+  net_gex: number[];
+  net_gex_positive: number[];
+  net_gex_negative: number[];
+  absolute_gamma: number[];
+  call_volume: number[];
+  put_volume: number[];
+  calls_oi: number[];
+  puts_oi: number[];
+  gamma_flip: number | null;
+  gamma_profile: GammaProfileData;
+  window_range: WindowRange;
+  timestamp: string;
+}
+
+export type TabValue = 'gex-charm' | 'volatility' | 'iv-skew' | 'advanced' | 'gex-enhanced';
 
 export const AVAILABLE_TICKERS = [
   { value: 'SPY', label: 'SPY - S&P 500 ETF' },

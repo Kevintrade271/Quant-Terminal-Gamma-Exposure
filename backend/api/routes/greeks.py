@@ -4,9 +4,11 @@ from ..services.greeks_calculator import build_greeks_df
 from ..services.volatility_calculator import get_vix_data, z_last
 from ..services.iv_skew_calculator import calculate_iv_skew
 from ..services.advanced_analytics import get_advanced_analytics
+from ..services.gex_enhanced import build_enhanced_gex_data
 from ..models.schemas import (
     GreeksResponse, GreekDataPoint, StatusResponse, ErrorResponse,
-    IVSkewResponse, IVSkewDataPoint, AdvancedAnalyticsResponse
+    IVSkewResponse, IVSkewDataPoint, AdvancedAnalyticsResponse,
+    GexEnhancedResponse, GammaProfileData, WindowRange
 )
 
 router = APIRouter()
@@ -126,6 +128,47 @@ async def get_advanced_analytics_endpoint(
             net_gamma_profile=analytics["net_gamma_profile"],
             operational_levels=analytics["operational_levels"],
             volume_by_strike=analytics["volume_by_strike"]
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/gex-enhanced/{ticker}", response_model=GexEnhancedResponse)
+async def get_gex_enhanced(
+    ticker: str,
+    odte_only: bool = Query(default=False),
+    max_weekly: int = Query(default=2, ge=1, le=10),
+    max_monthly: int = Query(default=3, ge=1, le=12),
+    dealer_convention: str = Query(default='reverse_spotgamma'),
+    lambda_t: float = Query(default=3.0, ge=0, le=10.0)
+):
+    try:
+        data = build_enhanced_gex_data(
+            ticker=ticker.upper(),
+            odte_only=odte_only,
+            max_weekly=max_weekly,
+            max_monthly=max_monthly,
+            dealer_convention=dealer_convention,
+            lambda_T=lambda_t
+        )
+
+        return GexEnhancedResponse(
+            spot=data["spot"],
+            ticker=data["ticker"],
+            label=data["label"],
+            strikes=data["strikes"],
+            net_gex=data["net_gex"],
+            net_gex_positive=data["net_gex_positive"],
+            net_gex_negative=data["net_gex_negative"],
+            absolute_gamma=data["absolute_gamma"],
+            call_volume=data["call_volume"],
+            put_volume=data["put_volume"],
+            calls_oi=data["calls_oi"],
+            puts_oi=data["puts_oi"],
+            gamma_flip=data["gamma_flip"],
+            gamma_profile=GammaProfileData(**data["gamma_profile"]),
+            window_range=WindowRange(**data["window_range"]),
+            timestamp=datetime.now().isoformat()
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

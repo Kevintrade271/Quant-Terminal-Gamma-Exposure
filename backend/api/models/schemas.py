@@ -92,6 +92,35 @@ class AdvancedAnalyticsResponse(BaseModel):
     volume_by_strike: dict
 
 
+class GammaProfileData(BaseModel):
+    price_grid: List[float]
+    profile: List[float]
+
+
+class WindowRange(BaseModel):
+    low: float
+    high: float
+
+
+class GexEnhancedResponse(BaseModel):
+    spot: float
+    ticker: str
+    label: str
+    strikes: List[float]
+    net_gex: List[float]
+    net_gex_positive: List[float]
+    net_gex_negative: List[float]
+    absolute_gamma: List[float]
+    call_volume: List[float]
+    put_volume: List[float]
+    calls_oi: List[float]
+    puts_oi: List[float]
+    gamma_flip: Optional[float] = None
+    gamma_profile: GammaProfileData
+    window_range: WindowRange
+    timestamp: str
+
+
 class ErrorResponse(BaseModel):
     error: str
     detail: Optional[str] = None

@@ -19,13 +19,14 @@ import {
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { theme } from '@/lib/theme';
-import { fetchGreeks, fetchVolatility, fetchStatus, fetchIVSkew, fetchAdvancedAnalytics } from '@/lib/api';
-import type { GreeksResponse, VolatilityResponse, StatusResponse, IVSkewResponse, AdvancedAnalyticsResponse, TabValue } from '@/lib/types';
+import { fetchGreeks, fetchVolatility, fetchStatus, fetchIVSkew, fetchAdvancedAnalytics, fetchGexEnhanced } from '@/lib/api';
+import type { GreeksResponse, VolatilityResponse, StatusResponse, IVSkewResponse, AdvancedAnalyticsResponse, GexEnhancedResponse, TabValue } from '@/lib/types';
 import { AVAILABLE_TICKERS } from '@/lib/types';
 import GexCharmChart from '@/components/GexCharmChart';
 import VolatilityHeatmap from '@/components/VolatilityHeatmap';
 import IVSkewChart from '@/components/IVSkewChart';
 import AdvancedAnalyticsView from '@/components/AdvancedAnalyticsView';
+import GexEnhancedChart from '@/components/GexEnhancedChart';
 import TickerCard from '@/components/TickerCard';
 
 const REFRESH_INTERVAL = 5 * 60 * 1000;
@@ -38,6 +39,7 @@ export default function Dashboard() {
   const [volatilityData, setVolatilityData] = useState<VolatilityResponse | null>(null);
   const [ivSkewData, setIvSkewData] = useState<IVSkewResponse | null>(null);
   const [advancedData, setAdvancedData] = useState<AdvancedAnalyticsResponse | null>(null);
+  const [gexEnhancedData, setGexEnhancedData] = useState<GexEnhancedResponse | null>(null);
   const [statusData, setStatusData] = useState<StatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +53,7 @@ export default function Dashboard() {
       setVolatilityData(null);
       setIvSkewData(null);
       setAdvancedData(null);
+      setGexEnhancedData(null);
 
       if (activeTab === 'gex-charm') {
         const [greeks, status] = await Promise.all([
@@ -79,6 +82,13 @@ export default function Dashboard() {
           fetchStatus(ticker),
         ]);
         setAdvancedData(advanced);
+        setStatusData(status);
+      } else if (activeTab === 'gex-enhanced') {
+        const [gexEnhanced, status] = await Promise.all([
+          fetchGexEnhanced(ticker, odteMode),
+          fetchStatus(ticker),
+        ]);
+        setGexEnhancedData(gexEnhanced);
         setStatusData(status);
       }
 
@@ -244,6 +254,7 @@ export default function Dashboard() {
               <Tab label="🌡️ Volatilidad IV" value="volatility" />
               <Tab label="📈 IV Skew" value="iv-skew" />
               <Tab label="🎯 Advanced Analytics" value="advanced" />
+              <Tab label="⚡ GEX Enhanced" value="gex-enhanced" />
             </Tabs>
           </Box>
 
@@ -287,6 +298,10 @@ export default function Dashboard() {
 
               {activeTab === 'advanced' && advancedData && (
                 <AdvancedAnalyticsView data={advancedData} />
+              )}
+
+              {activeTab === 'gex-enhanced' && gexEnhancedData && (
+                <GexEnhancedChart data={gexEnhancedData} />
               )}
             </Box>
           )}

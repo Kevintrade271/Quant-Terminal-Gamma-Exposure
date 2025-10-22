@@ -1,5 +1,12 @@
 import axios from 'axios';
-import type { GreeksResponse, VolatilityResponse, StatusResponse, IVSkewResponse, AdvancedAnalyticsResponse } from './types';
+import type {
+  GreeksResponse,
+  VolatilityResponse,
+  StatusResponse,
+  IVSkewResponse,
+  AdvancedAnalyticsResponse,
+  GexEnhancedResponse
+} from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -32,6 +39,13 @@ export async function fetchIVSkew(ticker: string = 'SPY'): Promise<IVSkewRespons
 
 export async function fetchAdvancedAnalytics(ticker: string = 'SPY', odteOnly: boolean = false): Promise<AdvancedAnalyticsResponse> {
   const response = await api.get(`/api/advanced-analytics/${ticker}`, {
+    params: { odte_only: odteOnly }
+  });
+  return response.data;
+}
+
+export async function fetchGexEnhanced(ticker: string = 'SPY', odteOnly: boolean = false): Promise<GexEnhancedResponse> {
+  const response = await api.get(`/api/gex-enhanced/${ticker}`, {
     params: { odte_only: odteOnly }
   });
   return response.data;
